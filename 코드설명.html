@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AttriRadar 코드 읽기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600;700&display=swap">
+<style>
+/* Layout: code on the left, plain Korean on the right, one pair per idea.
+   Stacks to a single column on a phone. */
+:root{
+  --bg:#f4f5f7; --surface:#ffffff; --surface-2:#e8ebef;
+  --ink:#14181d; --muted:#5a6672; --line:#d5dae0;
+  --code-bg:#171d24; --code-ink:#dde5ec;
+  --amber:#b9700f; --amber-soft:#faecd6;
+  --blue:#13607f; --blue-soft:#dceef6;
+  --rose:#a32a2a; --rose-soft:#fae3e3;
+  --f-disp:"IBM Plex Serif",Georgia,serif;
+  --f-body:"IBM Plex Sans KR","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1419; --surface:#171e25; --surface-2:#1f2832;
+  --ink:#e2e9f0; --muted:#93a2b1; --line:#2a3542;
+  --code-bg:#0a0f14; --code-ink:#cfdae4;
+  --amber:#e0a258; --amber-soft:#31230f;
+  --blue:#5cb8d8; --blue-soft:#102732;
+  --rose:#ef8585; --rose-soft:#361c1c;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f1419; --surface:#171e25; --surface-2:#1f2832;
+  --ink:#e2e9f0; --muted:#93a2b1; --line:#2a3542;
+  --code-bg:#0a0f14; --code-ink:#cfdae4;
+  --amber:#e0a258; --amber-soft:#31230f;
+  --blue:#5cb8d8; --blue-soft:#102732;
+  --rose:#ef8585; --rose-soft:#361c1c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);
+  font-size:15.5px;line-height:1.66;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 64px;-webkit-text-size-adjust:100%}
+.wrap{max-width:1040px;margin:0 auto}
+header{padding-block:42px 20px;border-bottom:2px solid var(--blue)}
+h1{font-family:var(--f-disp);font-size:clamp(1.65rem,5vw,2.3rem);line-height:1.16;
+  margin:0 0 .4em;letter-spacing:-.018em;text-wrap:balance}
+.lede{color:var(--muted);margin:0;font-size:.97rem;max-width:720px}
+h2{font-family:var(--f-disp);font-size:1.38rem;letter-spacing:-.012em;
+  margin:46px 0 .5em;padding-top:16px;border-top:1px solid var(--line);text-wrap:balance}
+h2 .ln{font-family:var(--f-mono);font-size:.66rem;font-weight:600;color:var(--blue);
+  background:var(--blue-soft);padding:3px 9px;border-radius:999px;
+  vertical-align:middle;margin-right:10px;letter-spacing:.02em}
+h3{font-size:1.04rem;font-weight:700;margin:28px 0 .3em}
+p{margin:.6em 0;max-width:760px}
+code{font-family:var(--f-mono);font-size:.92em;background:var(--surface-2);
+  padding:1px 5px;border-radius:4px}
+
+/* 1:1 pair */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:0;
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:18px 0}
+.pair>.c{background:var(--code-bg);color:var(--code-ink);
+  font-family:var(--f-mono);font-size:.84rem;line-height:1.72;
+  padding:16px 18px;overflow-x:auto;white-space:pre;margin:0}
+.pair>.m{background:var(--surface);padding:16px 18px;font-size:.92rem;line-height:1.6}
+.pair>.m b{color:var(--blue)}
+.pair>.m .q{display:block;font-family:var(--f-mono);font-size:.74rem;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+@media (max-width:760px){
+  .pair{grid-template-columns:1fr}
+  .pair>.c{border-bottom:1px solid var(--line)}
+}
+.c .k{color:#7fb5e0}   /* 키워드 */
+.c .s{color:#c2e08a}   /* 문자열 */
+.c .n{color:#e0b25c}   /* 숫자 */
+.c .cm{color:#718396;font-style:italic}  /* 주석 */
+
+.map{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:18px 20px;margin:20px 0;font-family:var(--f-mono);font-size:.84rem;
+  line-height:1.95;overflow-x:auto;white-space:pre}
+.map b{color:var(--blue);font-weight:600}
+.note{background:var(--amber-soft);border-radius:9px;padding:14px 17px;margin:16px 0;font-size:.9rem}
+.note .tag{font-family:var(--f-mono);font-size:.71rem;font-weight:700;color:var(--amber);
+  letter-spacing:.07em;display:block;margin-bottom:5px}
+.qa{background:var(--rose-soft);border-radius:9px;padding:14px 17px;margin:16px 0;font-size:.9rem}
+.qa .tag{font-family:var(--f-mono);font-size:.71rem;font-weight:700;color:var(--rose);
+  letter-spacing:.07em;display:block;margin-bottom:5px}
+.tblwrap{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:.83rem}
+td.m{font-family:var(--f-mono)}
+ul,ol{margin:.6em 0;padding-left:1.3em;max-width:760px}
+li{margin:.3em 0}
+footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:.84rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <h1>코드가 무슨 말을 하고 있나</h1>
+  <p class="lede">index.html 한 파일, 1355줄. 왼쪽이 실제 코드, 오른쪽이 그 뜻입니다.
+  프로그래밍을 몰라도 읽히도록 짝을 지어뒀습니다.</p>
+</header>
+
+<h2><span class="ln">0</span>먼저 — 파일 하나에 세 가지가 들어 있습니다</h2>
+
+<div class="tblwrap">
+<table>
+<tr><th style="width:16%">구역</th><th style="width:16%">줄</th><th>무엇</th></tr>
+<tr><td><b>HTML</b></td><td class="m">211~431</td><td>화면에 <b>무엇이 있는지</b> — 버튼, 입력칸, 영상이 나올 자리</td></tr>
+<tr><td><b>CSS</b></td><td class="m">13~209</td><td>그것들이 <b>어떻게 보이는지</b> — 색, 크기, 배치</td></tr>
+<tr><td><b>JavaScript</b></td><td class="m">432~1353</td><td>버튼을 누르면 <b>무슨 일이 일어나는지</b> — 실제 동작 전부</td></tr>
+</table>
+</div>
+
+<p>발표에서 설명할 내용은 거의 전부 <b>JavaScript 구역</b>에 있습니다. 그 안이 다시 이렇게 나뉩니다.</p>
+
+<div class="map">432  <b>핵심 로직 시작</b>  /*CORE-START*/
+444    색 계산        rgbToHsv · classifyRGB · isSkin
+476    영역 분석      analyzeRegion · grayWorldGains
+510    어디를 볼까    personRegions · vehicleRegion · computeAttrs
+533  <b>문장 → 조건 해석</b>   parseRules · ruleMatches
+632  <b>추적 · 투표</b>        iou · Tracker · pushVote · updateApproach
+700  <b>핵심 로직 끝</b>    /*CORE-END*/
+───────────────────────────────────────────
+749    모델 불러오기  loadMP · buildDetector
+807    카메라 · 파일  startCamera · startFile
+876    경고음 · 음성  beep · vibrate · speak · fireAlarm
+<b>1007   메인 루프</b>      loop · processFrame   ← 심장
+1088   화면에 그리기  draw
+1221   기록 · 평가    정밀도 · 재현율 계산
+1325   버튼 연결</div>
+
+<div class="note"><span class="tag">읽는 요령</span>
+<code>/*CORE-START*/</code>부터 <code>/*CORE-END*/</code>까지(432~700줄)가 <b>이 앱의 아이디어가 담긴 부분</b>입니다.
+나머지는 화면을 그리고 버튼을 연결하는 배선입니다. 발표에서 물어보면 이 구간만 설명하면 됩니다.
+</div>
+
+<h2><span class="ln">1</span>코드를 읽는 최소 문법</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">const</span> COLOR_KEYS = [<span class="s">'red'</span>, <span class="s">'blue'</span>, …]</pre>
+<div class="m"><span class="q">값에 이름 붙이기</span>
+<b>const</b>는 "이름을 하나 만들어 값을 담아둔다"는 뜻입니다.
+여기선 <code>COLOR_KEYS</code>라는 이름에 색 이름 목록을 담아뒀습니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> iou(a, b){
+  …
+  <span class="k">return</span> inter / u;
+}</pre>
+<div class="m"><span class="q">기능에 이름 붙이기</span>
+<b>function</b>은 "재료를 받아서 결과를 돌려주는 기계"입니다.
+<code>iou</code>라는 기계에 상자 두 개(<code>a</code>, <code>b</code>)를 넣으면
+<b>return</b> 뒤의 값이 나옵니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">if</span>(score &lt; <span class="n">0.2</span>) <span class="k">return</span> <span class="k">false</span>;
+<span class="k">for</span>(<span class="k">const</span> r <span class="k">of</span> S.rules){ … }</pre>
+<div class="m"><span class="q">조건과 반복</span>
+<b>if</b>는 "~이면", <b>for…of</b>는 "목록의 것들을 하나씩 꺼내서"입니다.
+위 두 줄은 "점수가 0.2보다 작으면 거짓을 돌려줘",
+"조건 목록을 하나씩 꺼내서"라는 뜻입니다.</div>
+</div>
+
+<h2><span class="ln">444</span>색을 사람이 말하는 방식으로 바꾸기</h2>
+
+<p>컴퓨터는 색을 <b>빨강·초록·파랑의 양</b>(RGB)으로 저장합니다. 그런데 "빨간 옷"을 판정하려면
+사람이 말하는 방식이 필요합니다. 그래서 먼저 <b>HSV</b>로 바꿉니다.</p>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> rgbToHsv(r,g,b){
+  <span class="k">const</span> mx=Math.max(r,g,b),
+        mn=Math.min(r,g,b),
+        d=mx-mn;
+  …
+  <span class="k">return</span> [h, d/mx, mx/<span class="n">255</span>];
+}</pre>
+<div class="m"><span class="q">색의 좌표계를 바꾼다</span>
+세 숫자를 돌려줍니다.
+<b>H(색상)</b> 어떤 색인가 — 0~360도의 각도. 빨강 0도, 초록 120도, 파랑 240도.<br>
+<b>S(채도)</b> 얼마나 선명한가 — 0이면 무채색.<br>
+<b>V(명도)</b> 얼마나 밝은가 — 0이면 검정.<br><br>
+가장 큰 값과 가장 작은 값의 <b>차이(d)</b>가 선명함을 결정합니다.
+회색은 셋이 비슷해서 차이가 0입니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> classifyRGB(r,g,b){
+  <span class="k">const</span> [h,s,v]=rgbToHsv(r,g,b);
+  <span class="k">if</span>(v&lt;<span class="n">0.18</span>) <span class="k">return</span> <span class="s">'black'</span>;
+  <span class="k">if</span>(s&lt;<span class="n">0.18</span>){
+    <span class="k">if</span>(v&gt;<span class="n">0.78</span>) <span class="k">return</span> <span class="s">'white'</span>;
+    <span class="k">return</span> <span class="s">'gray'</span>;
+  }
+  <span class="k">if</span>(h&lt;<span class="n">14</span> || h&gt;=<span class="n">340</span>) <span class="k">return</span> <span class="s">'red'</span>;
+  …
+  <span class="k">if</span>(h&lt;<span class="n">165</span>) <span class="k">return</span> <span class="s">'green'</span>;
+  <span class="k">if</span>(h&lt;<span class="n">255</span>) <span class="k">return</span> <span class="s">'blue'</span>;
+}</pre>
+<div class="m"><span class="q">화소 하나 → 색 이름 하나</span>
+<b>순서가 중요합니다.</b> 위에서부터 차례로 거릅니다.<br><br>
+① <b>너무 어두우면</b> 무조건 검정 — 색상이 무슨 값이든 상관없음<br>
+② <b>선명하지 않으면</b> 흰색이나 회색 — 밝기로 가름<br>
+③ 여기까지 안 걸렸으면 <b>색이 있는 것</b>이니 각도로 이름을 정함<br><br>
+빨강만 두 군데(<code>h&lt;14</code>와 <code>h&gt;=340</code>)인 이유는
+색상환에서 빨강이 <b>0도를 걸쳐 있기</b> 때문입니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> isSkin(r,g,b){
+  <span class="k">const</span> y=<span class="n">0.299</span>*r+<span class="n">0.587</span>*g+<span class="n">0.114</span>*b;
+  <span class="k">const</span> cr=(r-y)*<span class="n">0.713</span>+<span class="n">128</span>;
+  <span class="k">const</span> cb=(b-y)*<span class="n">0.564</span>+<span class="n">128</span>;
+  <span class="k">return</span> y&gt;<span class="n">50</span> &amp;&amp; cr&gt;=<span class="n">135</span> &amp;&amp; cr&lt;=<span class="n">178</span>
+         &amp;&amp; cb&gt;=<span class="n">78</span> &amp;&amp; cb&lt;=<span class="n">132</span>;
+}</pre>
+<div class="m"><span class="q">이 화소가 피부색인가</span>
+<b>YCbCr</b>이라는 다른 색 표현으로 바꿉니다.
+밝기(<code>y</code>)와 색조(<code>cr</code>, <code>cb</code>)를 분리하는 방식입니다.<br><br>
+피부색은 <b>밝기와 무관하게</b> 색조가 좁은 범위에 모입니다.
+그래서 조명이 밝든 어둡든 같은 범위로 잡힙니다.
+모자 판정에서 <b>이마와 얼굴을 빼기 위해</b> 씁니다.</div>
+</div>
+
+<h2><span class="ln">476</span>영역 하나를 읽어 색 비율을 센다</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">const</span> step = Math.max(<span class="n">1</span>,
+  Math.floor(Math.sqrt(w*h/maxSamples)));
+
+<span class="k">for</span>(<span class="k">let</span> y=y0; y&lt;y1; y+=step){
+  <span class="k">for</span>(<span class="k">let</span> x=x0; x&lt;x1; x+=step){
+    counts[classifyRGB(r,g,b)]++;
+    n++;
+  }
+}</pre>
+<div class="m"><span class="q">전부 세지 않고 띄엄띄엄 센다</span>
+영역 안의 화소를 <b>전부</b> 읽으면 느립니다.
+그래서 약 <b>700개만 표본으로</b> 뽑습니다.<br><br>
+<code>step</code>은 "몇 칸씩 건너뛸까"입니다.
+영역이 넓을수록 크게 건너뜁니다.
+가로세로 둘 다 건너뛰니 넓이에 비례하도록 <b>제곱근</b>을 씁니다.<br><br>
+<code>counts[…]++</code>는 "그 색의 표를 한 장 더한다"는 뜻입니다.
+결국 <b>색깔별 투표함</b>입니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> grayWorldGains(data,W,H){
+  …
+  <span class="k">const</span> m=(sr+sg+sb)/(<span class="n">3</span>*n);
+  <span class="k">const</span> cl=v=&gt;Math.max(<span class="n">0.8</span>,
+                Math.min(<span class="n">1.25</span>,v));
+  <span class="k">return</span> [cl(m/(sr/n)),
+          cl(m/(sg/n)),
+          cl(m/(sb/n))];
+}</pre>
+<div class="m"><span class="q">조명 색을 중화한다</span>
+<b>Gray-world 가정</b> — "장면 전체를 평균 내면 회색이어야 한다".<br><br>
+노란 실내등 아래서는 평균이 노란 쪽으로 치우칩니다.
+그 치우친 만큼 <b>반대로 곱해서</b> 되돌립니다.<br><br>
+<code>cl</code>은 보정을 <b>0.8~1.25배로 제한</b>합니다.
+빨간 옷을 입은 사람이 화면을 가득 채우면
+평균이 빨개져서 보정이 폭주하는데, 그걸 막는 안전장치입니다.</div>
+</div>
+
+<h2><span class="ln">510</span>박스의 어디를 볼지 정한다</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> personRegions(b){
+  <span class="k">const</span> ar = b.h / b.w;   <span class="cm">// 세로/가로</span>
+
+  <span class="k">if</span>(ar&gt;=<span class="n">1.7</span>)  <span class="cm">// 전신</span>
+    <span class="k">return</span> {head:{y0:<span class="n">0</span>,   y1:<span class="n">.14</span>},
+            torso:{y0:<span class="n">.2</span>, y1:<span class="n">.46</span>}};
+
+  <span class="k">if</span>(ar&gt;=<span class="n">1.05</span>) <span class="cm">// 상반신</span>
+    <span class="k">return</span> {head:{y0:<span class="n">0</span>,   y1:<span class="n">.3</span>},
+            torso:{y0:<span class="n">.42</span>,y1:<span class="n">.86</span>}};
+
+  <span class="cm">// 근접(얼굴 위주)</span>
+  <span class="k">return</span> {head:{y0:<span class="n">0</span>,   y1:<span class="n">.42</span>},
+          torso:{y0:<span class="n">.56</span>,y1:<span class="n">.97</span>}};
+}</pre>
+<div class="m"><span class="q">박스 모양으로 거리를 짐작한다</span>
+<code>ar</code>은 박스의 <b>세로÷가로 비율</b>입니다.<br><br>
+<b>멀리 있으면</b> 전신이 들어와 길쭉합니다(1.7 이상).
+이때 상의는 박스의 위 20~46% 자리에 있습니다.<br>
+<b>가까우면</b> 얼굴만 크게 잡혀 정사각형에 가까워집니다.
+이때 상의는 훨씬 아래쪽입니다.<br><br>
+<b>숫자는 전부 비율</b>이라 박스가 커지든 작아지든 같은 자리를 가리킵니다.
+<b>거리 센서 없이 거리를 추정하는 트릭</b>입니다.</div>
+</div>
+
+<div class="note"><span class="tag">맥에서 보신 오판정의 원인</span>
+얼굴만 크게 잡혔을 때 쓰는 마지막 분기에서, 상의 영역이 <code>y 0.56~0.97</code>입니다.
+그 자리에 <b>목과 어깨 피부</b>가 들어오면 피부색이 갈색으로 분류되어
+"상의 갈색 41%"가 나옵니다. <b>2~3m 떨어지면</b> 첫 번째 분기로 넘어가 정상이 됩니다.
+</div>
+
+<h2><span class="ln">533</span>문장을 조건으로 바꾸기</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">const</span> COLOR_WORDS=[
+  [<span class="s">'빨간'</span>,<span class="s">'red'</span>], [<span class="s">'빨강'</span>,<span class="s">'red'</span>],
+  [<span class="s">'붉은'</span>,<span class="s">'red'</span>], [<span class="s">'레드'</span>,<span class="s">'red'</span>],
+  [<span class="s">'하늘색'</span>,<span class="s">'blue'</span>], [<span class="s">'남색'</span>,<span class="s">'blue'</span>],
+  …
+];
+<span class="k">const</span> HAT_NEG_RE=/(안\s*쓴|쓰지\s*않|
+  미착용|없는|벗은|without)/i;</pre>
+<div class="m"><span class="q">한국어를 알아듣는 사전</span>
+AI가 문장을 이해하는 게 아니라 <b>단어 사전으로 찾습니다.</b><br><br>
+"빨간", "빨강", "붉은", "레드"가 모두 같은 <code>red</code>로 연결됩니다.
+그래서 어떻게 써도 알아듣습니다.<br><br>
+아래는 <b>정규식</b>이라는 패턴 검색입니다.
+"안 쓴", "쓰지 않", "미착용" 중 하나라도 있으면
+<b>모자를 안 쓴 사람</b>을 찾는 조건으로 뒤집습니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> ruleMatches(rule,obs,opts){
+  <span class="k">if</span>(rule.kind===<span class="s">'person'</span>){
+    <span class="k">if</span>(obs.cls!==<span class="s">'person'</span>) <span class="k">return</span> <span class="k">false</span>;
+  }
+
+  <span class="k">if</span>(opts.baseline) <span class="k">return</span> <span class="k">true</span>;  <span class="cm">// ★</span>
+
+  <span class="k">if</span>(rule.color){
+    <span class="k">if</span>(obs.colorFrac[rule.color]
+       &lt; opts.colorThr) <span class="k">return</span> <span class="k">false</span>;
+  }
+  <span class="k">if</span>(rule.hat !== <span class="k">null</span>){
+    <span class="k">if</span>(obs.hat !== rule.hat) <span class="k">return</span> <span class="k">false</span>;
+  }
+  <span class="k">return</span> <span class="k">true</span>;
+}</pre>
+<div class="m"><span class="q">이 대상이 조건에 맞나</span>
+위에서부터 <b>하나라도 틀리면 바로 false</b>로 끝냅니다.
+모든 관문을 통과해야 마지막에 true가 나옵니다.<br><br>
+<b>★ 표시한 줄이 발표의 핵심입니다.</b>
+<code>baseline</code>(비교 모드)이 켜져 있으면
+<b>색과 모자를 아예 검사하지 않고</b> 바로 통과시킵니다.<br><br>
+즉 이 한 줄이 <b>기준 앱 방식을 재현</b>합니다.
+같은 코드, 같은 탐지기에서 <b>이 줄 하나만</b> 다르게 동작시켜
+속성 판정의 효과를 분리해 측정합니다.</div>
+</div>
+
+<h2><span class="ln">632</span>같은 사람인지 알아보고 따라가기</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> iou(a,b){
+  <span class="k">const</span> x0=Math.max(a.x,b.x),
+        y0=Math.max(a.y,b.y),
+        x1=Math.min(a.x+a.w, b.x+b.w),
+        y1=Math.min(a.y+a.h, b.y+b.h);
+  <span class="k">const</span> inter=Math.max(<span class="n">0</span>,x1-x0)
+             *Math.max(<span class="n">0</span>,y1-y0);
+  <span class="k">const</span> u=a.w*a.h + b.w*b.h - inter;
+  <span class="k">return</span> inter/u;
+}</pre>
+<div class="m"><span class="q">두 상자가 얼마나 겹치나</span>
+<b>IoU = 겹친 넓이 ÷ 합친 넓이.</b><br><br>
+<code>inter</code>가 겹친 부분, <code>u</code>가 둘을 합친 부분입니다.
+합칠 때 겹친 부분을 <b>한 번 빼는</b> 이유는 두 번 세지 않기 위함입니다.<br><br>
+결과는 <b>0~1</b>. 완전히 포개지면 1, 안 닿으면 0.
+이전 프레임의 상자와 지금 상자가 <b>0.2 이상</b> 겹치면
+<b>같은 사람</b>으로 봅니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">if</span>(best&gt;=<span class="n">0</span>){
+  <span class="cm">// 기존 대상을 찾음 → 갱신</span>
+  t.box=d.box; t.hits++;
+  t.clsVotes[d.cls]++;
+  t.cls = <span class="cm">/* 표를 제일 많이 받은 종류 */</span>;
+}<span class="k">else</span>{
+  <span class="cm">// 못 찾음 → 새 번호 부여</span>
+  <span class="k">const</span> t={ id:<span class="k">this</span>.nextId++, … };
+}
+<span class="cm">// 1.2초 안 보이면 삭제</span>
+<span class="k">this</span>.tracks=<span class="k">this</span>.tracks
+  .filter(t=&gt;now-t.lastSeen&lt;=<span class="n">1200</span>);</pre>
+<div class="m"><span class="q">번호표를 붙여 관리한다</span>
+겹치는 상자를 찾으면 <b>같은 사람</b>으로 보고 정보를 갱신하고,
+못 찾으면 <b>새 번호</b>를 줍니다. 화면의 <code>#1</code>, <code>#2</code>가 이 번호입니다.<br><br>
+<code>clsVotes</code>는 <b>차종 투표함</b>입니다.
+한 프레임에서 트럭으로 잘못 잡혀도
+전체적으로 승용차 표가 많으면 승용차로 유지됩니다.<br><br>
+마지막 줄은 <b>1.2초 동안 안 보이면 잊는다</b>는 뜻입니다.
+잠깐 가려져도 번호를 유지하되, 영영 사라지면 지웁니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> pushVote(t,v,N){
+  t.hist.push(v?<span class="n">1</span>:<span class="n">0</span>);
+  <span class="k">while</span>(t.hist.length&gt;N) t.hist.shift();
+}
+<span class="k">function</span> sumVotes(t){
+  <span class="k">let</span> s=<span class="n">0</span>;
+  <span class="k">for</span>(<span class="k">const</span> v <span class="k">of</span> t.hist) s+=v;
+  <span class="k">return</span> s;
+}</pre>
+<div class="m"><span class="q">최근 6프레임의 투표함</span>
+조건에 맞으면 <b>1</b>, 아니면 <b>0</b>을 뒤에 넣고,
+<b>6개가 넘으면 맨 앞을 버립니다.</b>
+항상 최근 6개만 남습니다.<br><br>
+<code>sumVotes</code>로 1의 개수를 세서 <b>4 이상</b>이면 확정.<br><br>
+이것 때문에 <b>한 프레임의 착각으로는 경보가 안 납니다.</b>
+기준 앱과 갈리는 지점이 여기입니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> updateApproach(t,now){
+  <span class="k">const</span> a=t.box.w*t.box.h;
+  t.areaHist.push({t:now, a});
+  <span class="cm">// 1.5초보다 오래된 기록은 버림</span>
+  <span class="k">while</span>(now-t.areaHist[<span class="n">0</span>].t&gt;<span class="n">1500</span>)
+    t.areaHist.shift();
+
+  t.growth = a / t.areaHist[<span class="n">0</span>].a;
+  t.approaching = t.growth &gt; <span class="n">1.3</span>;
+}</pre>
+<div class="m"><span class="q">다가오고 있나</span>
+<b>상자 넓이</b>를 계속 기록해두고,
+지금 넓이를 1.5초 전 넓이로 나눕니다.<br><br>
+<b>30% 이상 커졌으면</b> 다가오는 것으로 봅니다.<br><br>
+거리를 재는 게 아니라 <b>커지는 속도</b>로 판단합니다.
+카메라 한 대로 거리를 알 수는 없지만,
+빠르게 커지면 가까워지는 건 확실합니다.</div>
+</div>
+
+<h2><span class="ln">1007</span>심장 — 한 프레임에 일어나는 일</h2>
+
+<p>위의 조각들이 <b>여기서 순서대로 호출됩니다.</b> 1초에 약 30번 반복됩니다.</p>
+
+<div class="pair">
+<pre class="c"><span class="k">function</span> loop(){
+  <span class="k">if</span>(!S.running) <span class="k">return</span>;
+  rafId=requestAnimationFrame(loop);  <span class="cm">// ①</span>
+
+  <span class="k">if</span>(v.currentTime===lastVT) <span class="k">return</span>; <span class="cm">// ②</span>
+  lastVT=v.currentTime;
+
+  res = detector.detectForVideo(v,ts); <span class="cm">// ③</span>
+  processFrame(res, ts, …);
+}</pre>
+<div class="m"><span class="q">영상 한 장을 가져온다</span>
+<b>①</b> <code>requestAnimationFrame</code>은 브라우저에게
+"다음 화면 그릴 때 나를 또 불러줘"라고 부탁하는 것입니다.
+그래서 <b>화면 주사율에 맞춰</b> 자동 반복됩니다.<br><br>
+<b>②</b> 영상 시각이 아까와 같으면 <b>같은 장면</b>이니 그냥 넘깁니다.
+쓸데없이 두 번 계산하지 않기 위함입니다.<br><br>
+<b>③</b> 여기서 MediaPipe가 실제 탐지를 합니다.
+박스 목록이 <code>res</code>에 담겨 돌아옵니다.</div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">const</span> aw=Math.min(<span class="n">480</span>, vw);
+apix.drawImage(v, <span class="n">0</span>,<span class="n">0</span>, aw, ah);
+img = apix.getImageData(<span class="n">0</span>,<span class="n">0</span>, aw, ah);
+
+<span class="k">const</span> gains = grayWorldGains(img.data,…);
+<span class="k">const</span> seen = tracker.update(dets, ts);</pre>
+<div class="m"><span class="q">색을 읽을 작은 사본을 만든다</span>
+원본이 1280px이어도 <b>480px로 줄인 사본</b>을 하나 만듭니다.
+색 비율만 알면 되니 고화질이 필요 없고, <b>훨씬 빠릅니다.</b><br><br>
+<code>getImageData</code>가 화소를 숫자 배열로 꺼내옵니다.
+이제 <code>classifyRGB</code>로 셀 수 있습니다.<br><br>
+<code>tracker.update</code>로 각 상자에 <b>번호를 붙입니다.</b></div>
+</div>
+
+<div class="pair">
+<pre class="c"><span class="k">for</span>(<span class="k">const</span> t <span class="k">of</span> seen){
+  t.attrs = computeAttrs(…);        <span class="cm">// 색·모자</span>
+  t.inZone = inZone(t.box,…);       <span class="cm">// 구역 안?</span>
+
+  <span class="k">for</span>(<span class="k">const</span> r <span class="k">of</span> S.rules){
+    <span class="k">if</span>(ruleMatches(r,obs,…)){ matched=r; <span class="k">break</span>; }
+  }
+
+  pushVote(t, !!matched, N);         <span class="cm">// 투표</span>
+  t.votes = sumVotes(t);
+  t.confirmed = t.votes&gt;=K &amp;&amp; t.lastRule;
+
+  <span class="k">if</span>(t.confirmed &amp;&amp; ts-t.lastAlarm&gt;=cd){
+    fireAlarm(t, urgent);            <span class="cm">// 경보!</span>
+  }
+}</pre>
+<div class="m"><span class="q">대상마다 네 단계를 거친다</span>
+발표 슬라이드의 <b>네 단계가 이 반복문 안</b>에 그대로 있습니다.<br><br>
+<b>①</b> <code>computeAttrs</code> — 색과 모자 판정<br>
+<b>②</b> <code>ruleMatches</code> — 조건에 맞나<br>
+<b>③</b> <code>pushVote</code> + <code>sumVotes</code> — 6번 중 4번인가<br>
+<b>④</b> <code>fireAlarm</code> — 경보<br><br>
+<code>ts-t.lastAlarm&gt;=cd</code>가 <b>8초 쿨다운</b>입니다.
+마지막 경보로부터 8초가 지나야 다시 울립니다.
+같은 사람에게 계속 울리는 걸 막습니다.</div>
+</div>
+
+<h2><span class="ln">1221</span>정밀도와 재현율을 계산하는 곳</h2>
+
+<div class="pair">
+<pre class="c"><span class="k">const</span> tp=cnt(<span class="s">'tp'</span>),   <span class="cm">// 정답</span>
+      dup=cnt(<span class="s">'dup'</span>), <span class="cm">// 재경보</span>
+      fp=cnt(<span class="s">'fp'</span>);   <span class="cm">// 오탐</span>
+<span class="k">const</span> marked=tp+dup+fp;
+
+evPrec = (tp+dup)/marked;      <span class="cm">// 정밀도</span>
+evRec  = Math.min(<span class="n">1</span>, tp/total); <span class="cm">// 재현율</span>
+evFpm  = fp/min;               <span class="cm">// 분당 오탐</span></pre>
+<div class="m"><span class="q">발표 숫자가 나오는 자리</span>
+<b>정밀도</b> = 울린 것 중 맞게 울린 비율.
+재경보는 <b>중복이지 틀린 건 아니므로</b> 분자에 넣습니다.
+질문이 나오면 이렇게 답하면 됩니다.<br><br>
+<b>재현율</b> = 찾아야 할 것 중 실제로 찾은 비율.
+여기엔 재경보를 <b>빼야</b> 합니다. 같은 사람을 두 번 세면 안 되니까요.<br><br>
+<b>분당 오탐</b> = 헛경보 횟수 ÷ 분.
+감시 장비에서 가장 중요한 지표입니다.</div>
+</div>
+
+<h2><span class="ln">Q</span>질문이 나오면</h2>
+
+<div class="qa"><span class="tag">"AI 모델을 직접 학습시켰나요?"</span>
+탐지 모델은 구글이 학습시킨 EfficientDet을 <b>그대로 가져다 씁니다.</b>
+속성 판정은 학습이 아니라 <b>색공간 변환과 규칙</b>으로 구현했습니다.
+모자 판정은 선택적으로 Teachable Machine 모델을 붙일 수 있게 해뒀습니다.
+</div>
+
+<div class="qa"><span class="tag">"색 기준값은 어떻게 정했나요?"</span>
+직접 찍은 영상으로 맞췄습니다. 색은 <b>30%</b>, 모자는 <b>40%</b>가 기본값이고,
+설정에서 바꿀 수 있게 열어뒀습니다. 고정값이 아니라 조정 가능한 매개변수입니다.
+</div>
+
+<div class="qa"><span class="tag">"6프레임 중 4번은 왜 그 숫자인가요?"</span>
+초당 30프레임이면 <b>6프레임은 약 0.2초</b>입니다.
+사람이 지나가는 속도에서 놓치지 않으면서, 한두 프레임의 착각은 거를 수 있는 길이입니다.
+이 값도 설정에서 바꿀 수 있고, <b>1/1로 두면 투표가 꺼집니다.</b>
+그 상태가 측정표의 C 조건입니다.
+</div>
+
+<div class="qa"><span class="tag">"영상이 서버로 가나요?"</span>
+가지 않습니다. 모델 파일만 처음에 내려받고, <b>영상 처리는 전부 브라우저 안</b>에서 일어납니다.
+그래서 인터넷이 끊겨도 한 번 켠 뒤에는 계속 돌아갑니다.
+</div>
+
+<footer>
+index.html 1355줄 기준 · 줄 번호는 받으신 아이폰 대응 버전입니다.
+코드를 직접 보시려면 맥에서 <code>open -e ~/Desktop/attriradar/index.html</code> 로 열면 됩니다.
+</footer>
+
+</div>
+
+</body>
+</html>
